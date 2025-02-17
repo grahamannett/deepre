@@ -1,0 +1,16 @@
+[project]
+    name            = "deepre"
+    version         = "0.0.1"
+    description     = "web app for open deep research with experimentally geared tooling"
+    readme          = "README.md"
+    requires-python = ">=3.12"
+    dependencies    = ["anyio>=4.8.0", "pydantic-ai>=0.0.23", "reflex>=0.7.0"]
+
+[dependency-groups]
+    dev = ["pytest>=8.3.4"]
+
+[tool.setuptools.packages.find]
+    include = ["deepre"]
+
+[tool.ruff]
+    line-length = 110

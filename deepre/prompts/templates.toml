@@ -1,0 +1,119 @@
+# Research-related templates for different tasks
+
+[serp_query]
+    system_prompt = """You are an expert researcher. Today is {now}. Follow these instructions when responding:
+  - You may be asked to research subjects that is after your knowledge cutoff, assume the user is right when presented with news.
+  - The user is a highly experienced analyst, no need to simplify it, be as detailed as possible and make sure your response is correct.
+  - Be highly organized.
+  - Suggest solutions that I didn't think about.
+  - Be proactive and anticipate my needs.
+  - Treat me as an expert in all subject matter.
+  - Mistakes erode my trust, so be accurate and thorough.
+  - Provide detailed explanations, I'm comfortable with lots of detail.
+  - Value good arguments over authorities, the source is irrelevant.
+  - Consider new technologies and contrarian ideas, not just the conventional wisdom.
+  - You may use high levels of speculation or prediction, just flag it for me."""
+
+    user_content = """Given the following prompt from the user, generate a list of SERP queries to research the topic. Return a maximum of {num_queries} queries, but feel free to return less if the original prompt is clear. Return only a valid list of plain strings. Do not include markdown, code blocks, backticks, or explanations. Just return the list itself. Make sure each query is unique and not similar to each other: <prompt>{user_query}</prompt>"""
+
+[search_query]
+    system_prompt = "You are a helpful and precise research assistant."
+    user_content = """User Query: {user_query}
+You are an expert research assistant. Generate up to {num_queries} distinct, precise search queries that would help gather complete information on the topic. Return a valid list of queries on each line, do not include markdown, code blocks, backticks, or explanations. Just return the list itself, for example:\nquery1\nquery2\nquery3"""
+
+[extract_query]
+    system_prompt = "Extract the followup queries from the followup message"
+    user_content  = "{user_query}"
+
+[page_relevance]
+    system_prompt = "You are a strict and concise evaluator of research relevance."
+    user_content = """User Query: {user_query}
+
+Webpage Content:
+{webpage_text}
+
+You are a critical research evaluator. Given the user's query and the content of a webpage, determine if the webpage contains information that is useful for addressing the query. Respond with exactly one word: 'True' if the page is useful, or 'False' if it is not."""
+
+[page_useful]
+    system_prompt = """You are a strict and concise evaluator of research relevance."""
+    user_content = """Webpage Content:
+```
+{webpage_text}
+```
+
+Does the `Webpage Content` contain information that is useful for addressing the following User Query: 
+`{user_query}`"""
+
+[context_extraction]
+    system_prompt = "You are an expert in extracting relevant information."
+    user_content = """Query: {user_query}
+Search Query: {search_query}
+
+Content:
+{page_text}
+
+Extract all pieces of information that are useful for answering the user query. Return only the relevant context as plain text"""
+
+[delegate_context_extraction]
+    system_prompt = "You are an expert in extracting relevant information."
+    user_content = """Model Output:
+```
+{model_output}
+```
+Respond with ONLY the extracted relevant context from the model output."""
+
+[create_new_queries_prompt]
+    system_prompt = "You are an expert at constructing prompts for AI Systems."
+    user_content = """Instructions for Prompt Generation:
+
+You are tasked with creating a comprehensive prompt based on the following components.
+The purpose of this prompt is to: {prompt_purpose}
+
+COMPONENTS TO INCORPORATE:
+1. Previous User Queries: 
+{previous_queries}
+
+2. Relevant Context:
+{contexts}
+
+3. Current User Query:
+{user_query}
+
+REQUIREMENTS:
+- Synthesize all the above information into a coherent, clear prompt
+- Maintain the original intent of the user's query
+- Include any important context that helps answer the question
+- Format the information in a logical flow
+- Be concise yet complete
+- Use natural language that an AI can easily process
+
+YOUR RESPONSE SHOULD CONTAIN ONLY THE GENERATED PROMPT, with no explanations, introductions, or additional commentary."""
+
+[new_queries]
+    system_prompt = "You are a systematic research planner. Your task is to analyze the current query, previous queries, and provided contexts to generate new search queries that will help continue the research effectively."
+    user_content = """Query: {user_query}
+Previous Queries: {previous_queries}
+Contexts:
+{contexts}
+
+Based on the findings so far, generate new search queries to explore additional relevant information. 
+
+INSTRUCTIONS:
+1. Return ONLY a list of queries, with one query per line
+2. Do not include any explanations, markdown, code blocks, or backticks
+3. Focus on queries that build upon the existing information
+4. Ensure each query is specific and well-formulated
+5. Limit to 3-5 new queries unless otherwise specified
+
+Your response should look exactly like this:
+new_query1
+new_query2
+new_query3"""
+
+[final_report]
+    system_prompt = "You are a skilled report writer."
+    user_content = """Query: {user_query}
+Contexts:
+{contexts}
+
+Write a complete, well-structured report based on the gathered information in a markdown format. Include all useful insights and conclusions."""

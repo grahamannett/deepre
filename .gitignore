@@ -1,0 +1,22 @@
+.states
+*.db
+assets/external/
+*.py[cod]
+.web
+__pycache__/
+deepre.egg-info/
+
+.DS_Store
+
+.env
+# TODO: Readd these once app is deployable
+# ignore below until fully working app
+uv.lock
+.python-version
+requirements.txt
+
+services/
+**/_stubs*
+
+# windsurf rules
+.windsurfrules

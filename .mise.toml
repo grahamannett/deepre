@@ -1,0 +1,7 @@
+[env]
+    # use .env file until mise toml file is fixed
+    _.file = { path = ".env", redact = true }
+
+[tasks."show:secrets"]
+    # print the secrets file to stdout for readme info
+    run = "cat .env"
