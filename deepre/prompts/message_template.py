@@ -1,17 +1,22 @@
-import tomllib
 from dataclasses import dataclass
-from functools import cache
 from pathlib import Path
 from typing import Any
 
-template_toml_file = Path(__file__).parent / "templates.toml"
+from deepre.app_config import conf
+from deepre.utils import read_toml_file
+
+template_toml_file = conf.tomls_dir / "templates.toml"
+model_config_file = conf.tomls_dir / conf.model_configs_file
 
 
-@cache
-def _read_toml_file(toml_file: str | Path) -> dict[str, Any]:
-    with open(toml_file, "rb") as f:
-        data = tomllib.load(f)
-    return data
+def get_model_configs() -> dict[str, Any]:
+    """
+    Load and cache model configurations from TOML file.
+
+    Returns:
+        dict[str, Any]: Model configuration dictionary
+    """
+    return read_toml_file(model_config_file)
 
 
 @dataclass
@@ -86,7 +91,7 @@ class MessageTemplate:
             tomllib.TOMLDecodeError: If there's an error decoding the TOML file.
         """
 
-        data = _read_toml_file(toml_file)
+        data = read_toml_file(toml_file)
 
         try:
             template_data = data[key]

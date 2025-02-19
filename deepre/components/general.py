@@ -22,9 +22,12 @@ def final_report_component() -> rx.Component:
 
 
 def index_header() -> rx.Component:
-    return rx.heading(
-        "Open Deep Researcher 🔬",
-        size="8",
-        margin_bottom="1rem",
-        margin_left="16rem",
+    return rx.box(
+        rx.heading(
+            "Open Deep Researcher 🔬",
+            size="8",
+            margin_bottom="1rem",
+            margin_left="16rem",
+        ),
+        rx.text("Enter your research query to generate a report."),
     )

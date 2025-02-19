@@ -1,0 +1,9 @@
+[reasoning]
+    model_name = "deepseek-r1:70b"
+    base_url   = "http://localhost:11434/v1"
+    api_key    = "ollama-api-key"
+
+[tool]
+    model_name = "llama3.3:70b"
+    base_url   = "http://localhost:11434/v1"
+    api_key    = "ollama-api-key"

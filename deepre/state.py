@@ -1,44 +1,39 @@
-import time
-import asyncio
-
+import json
 from uuid import uuid4
-import reflex as rx
+
 import httpx
+import reflex as rx
 
 from deepre import query
-from deepre.provider import LLMProvider
-from deepre.utils import logger
+from deepre.prompts.message_template import get_model_configs
+from deepre.provider import Agent, LLMProvider, ModelType
+from deepre.utils import Timestamp, logger
 
+model_configs = get_model_configs()
 
-model_configs = {
-    "reasoning": {
-        "model_name": "deepseek-r1:70b",
-        "base_url": "http://localhost:11434/v1",
-        "api_key": "ollama-api-key",
-    },
-    "tool": {
-        "model_name": "llama3.3:70b",
-        "base_url": "http://localhost:11434/v1",
-        "api_key": "ollama-api-key",
-    },
-}
-
-reasoning_model = LLMProvider["ollama"](**model_configs["reasoning"])
-tool_model = LLMProvider["ollama"](**model_configs["tool"])
-
-
-class _Timestamp:
-    @property
-    def now(self) -> str:
-        return time.strftime("%H:%M:%S")
-
-
-Timestamp = _Timestamp()
+_reasoning_model: LLMProvider = LLMProvider["ollama"](**model_configs["reasoning"])
+_tool_model: LLMProvider = LLMProvider["ollama"](**model_configs["tool"])
 
 
 class Response(rx.Base):
     response_text: str
     response_id: str
+
+
+class LLMInfo(rx.Base):
+    typeof: str
+    model_name: str
+    base_url: str
+    api_key: str
+
+    _model_inst: ModelType = LLMProvider["ollama"](**model_configs["reasoning"])
+
+    def update_inst(self):
+        self._model_inst = LLMProvider["ollama"](
+            model_name=self.model_name,
+            base_url=self.base_url,
+            api_key=self.api_key,
+        )
 
 
 class ResearchState(rx.State):
@@ -52,7 +47,22 @@ class ResearchState(rx.State):
     responses: list[Response] = []
     is_processing: bool = False
 
-    model_configs = model_configs
+    models: dict[str, LLMInfo] = {
+        "reasoning": LLMInfo(typeof="reasoning", **model_configs["reasoning"]),
+        "tool": LLMInfo(typeof="tool", **model_configs["tool"]),
+    }
+
+    def on_change_model_field_setting(self, model_type: str, field: str, value: str):
+        """
+        this has to be on rx.State rather than LLMInfo because of reflex
+        """
+        setattr(self.models[model_type], field, value)
+
+    async def on_submit_model_setting(self, model_typeof: str, data: dict):
+        """
+        this and change_model_field are basically the same thing, this is just the button version
+        """
+        pass
 
     def _add_response(self, response: str):
         resp = Response(response_text=response, response_id=uuid4().hex)
@@ -100,13 +110,14 @@ class ResearchState(rx.State):
 
             # First get reasoning model's output, then extract queries using tool model
             model_resp = await query.generate_search_queries(
-                model=reasoning_model,
+                # model=_reasoning_model,
+                model=self.models["reasoning"]._model_inst,
                 user_query=self.user_query,
             )
 
             self._add_response(model_resp)
             queries_result = await query.extract_queries_from_text(
-                model=tool_model,
+                model=_tool_model,
                 user_query=model_resp,
             )
             # queries = queries_result.data
@@ -159,8 +170,8 @@ class ResearchState(rx.State):
                         link=link,
                         search_query=search_query,
                         user_query=self.user_query,
-                        tool_model=tool_model,
-                        reasoning_model=reasoning_model,
+                        tool_model=_tool_model,
+                        reasoning_model=_reasoning_model,
                     )
 
                     if context:
@@ -178,7 +189,7 @@ class ResearchState(rx.State):
 
                 # Generate new queries based on current context
                 new_queries_result = await query.get_new_search_queries(
-                    model=tool_model,
+                    model=_tool_model,
                     user_query=self.user_query,
                     previous_queries=queries,
                     contexts=contexts,
@@ -201,7 +212,7 @@ class ResearchState(rx.State):
             yield
 
             final_report_result = await query.generate_final_report(
-                model=reasoning_model,
+                model=_reasoning_model,
                 user_query=self.user_query,
                 contexts=contexts,
             )

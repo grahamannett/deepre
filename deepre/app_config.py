@@ -1,5 +1,6 @@
-from os import environ
 from dataclasses import dataclass, field
+from os import environ
+from pathlib import Path
 from typing import Any
 
 
@@ -47,6 +48,14 @@ class AppConfig:
     ai = OllamaConfig
     serpapi = SerpConfig
     jina = JinaConfig
+
+    # allows for smaller templates/models to be used during dev these are still 3B+
+    # models since it seems like you want models that are capable of producing coherent
+    # long-form answers to get reliable results. alt `from reflex.utils.exec import is_prod_mode`
+    smol: bool = True
+
+    tomls_dir = Path(__file__).parent / "tomls"
+    model_configs_file = f"{'s.' if smol else ''}model_configs.toml"
 
 
 conf = AppConfig()
