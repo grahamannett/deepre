@@ -43,8 +43,12 @@ class MessageTemplate:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
+    def __call__(self, **kwargs) -> "MessageTemplate":
+        return self.update(**kwargs)
+
     def update(self, **kwargs) -> None:
         self.template_values.update(kwargs)
+        return self
 
     def get_system_prompt(self, **kwargs: Any) -> str:
         """

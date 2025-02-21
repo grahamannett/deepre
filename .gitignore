@@ -20,3 +20,5 @@ services/
 
 # windsurf rules
 .windsurfrules
+_ignore/
+.cache

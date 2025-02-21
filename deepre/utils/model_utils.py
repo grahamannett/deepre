@@ -1,10 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Type, TypeAlias
+from typing import Type
 
 from pydantic_ai.models import Model
-from reflex.utils import console
-
-logger: TypeAlias = console
 
 
 @dataclass(init=False)
@@ -52,17 +49,12 @@ class ModelClients:
 class ModelClients:
     """
     was trying to figure out best way to hold the model configs that can be changeable.
-    i dont think this will work with reflex
+    i dont think this will work with reflex since the state needs to be a part of the rx.State
     # model_clients = ModelClients()
     """
 
     clients = {}
     configs: dict[str, dict] = {}
-    # configs = {
-    #     # defaults
-    #     "reasoning": model_configs["reasoning"],
-    #     "tool": model_configs["tool"],
-    # }
 
     def __init__(self, model_configs):
         self.configs = {k: v for k, v in model_configs.items()}
