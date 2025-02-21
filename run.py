@@ -314,59 +314,6 @@ async def fetch_page_result(
     return PageResult(metadata=metadata, page_text=text)
 
 
-@serp_agent.tool
-async def fetch_page(ctx: RunContext[DeepResearchDeps], page_metadata: PageMetadata) -> PageResult:
-    """Fetch webpage text using Jina API.
-
-    Args:
-        client (httpx.AsyncClient): The HTTP client to use for the request
-        url (str): The URL of the webpage to fetch
-
-    Returns:
-        str: The text content of the webpage if successful, empty string otherwise
-
-    Note:
-        Uses Jina API with authentication for fetching webpage content.
-        Returns empty string on any errors or non-200 status codes.
-    """
-    logger.log(f">> FETCHING RESULTS FOR {page_metadata.url}")
-    breakpoint()
-    client = ctx.deps.http_client
-    url = page_metadata.url
-    full_url = f"{conf.jina.base_url}{url}"
-
-    try:
-        resp = await client.get(
-            url=full_url,
-            headers=fetch_api_headers,
-        )
-        # return resp.text if resp.status_code == 200 else ""
-        breakpoint()
-        result = PageResult(metadata=page_metadata, page_text=resp.text)
-        ctx.deps.page_results.append(result)
-        breakpoint()
-        return result
-    except Exception:
-        return ""
-
-
-@serp_agent.tool
-async def check_if_page_fetched(ctx: RunContext[DeepResearchDeps], page_metadata: PageMetadata) -> bool:
-    """Check if the page has already been fetched.
-
-    Args:
-        page_metadata (PageMetadata): The metadata of the page to check.
-
-    Returns:
-        bool: True if the page has already been fetched, False otherwise.
-    """
-    logger.log(f">> CHECKING IF PAGE HAS BEEN FETCHED: {page_metadata.url}")
-    for result in ctx.deps.page_results:
-        if result.metadata.url == page_metadata.url:
-            return True
-    return False
-
-
 async def main(query: str = base_q):
     async with httpx.AsyncClient() as client:
         deps = DeepResearchDeps(http_client=client, original_query=query)
@@ -374,7 +321,6 @@ async def main(query: str = base_q):
         with capture_run_messages() as messages:
             result = await research_agent.run(query, deps=deps)
             msgs = result.all_messages()
-        # breakpoint()
 
 
 async def search(query: str = base_s_q, original_query: str = base_q):
@@ -387,7 +333,6 @@ async def search(query: str = base_s_q, original_query: str = base_q):
 
         _print_msgs(*msgs)
         logger.info(f"Finished lé search, got these messages, {msgs}")
-        breakpoint()
 
 
 def parse_args():
