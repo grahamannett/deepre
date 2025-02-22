@@ -2,7 +2,7 @@
 
 This was started off of the [reflex example](https://github.com/reflex-dev/reflex-llm-examples/tree/main/open_deep_researcher) but meant to be run locally.
 
-![Example Screenshot](assets/example.png)
+![Example Screenshot](docs/assets/example.png)
 
 # Usage
 
@@ -47,7 +47,7 @@ uv run reflex run
 - https://huggingface.co/blog/open-deep-research
 
 # Notes / TODO
-
+- If using Ollama, the models context length is likely to be the default for many model (2048). To extend the model to longer context which is necessary for various parts of this system to work.  There is a simple helper script to extend the model in `deepre/utils/ollama_helper.py` and eventually that should be moved into a check done automatically that runs before the model is loaded.
 - Using the `result_type` argument of `run`/`agent` doesnt seem to work when trying to cast the result for the models used. Should ideally be fixed but no obvious ways I've tried have worked.
 - Should move the tool usage and delegation to [agent delegation](https://ai.pydantic.dev/multi-agent-applications/#agent-delegation)
 

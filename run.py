@@ -1,10 +1,12 @@
 import hashlib
+import json
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import cache
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from pydantic_ai import Agent, RunContext, capture_run_messages
 from pydantic_ai.models.openai import OpenAIModel
 from rich.prompt import Prompt
@@ -15,8 +17,14 @@ from deepre.utils import logger
 base_q = "How does openai deep research work?"
 base_s_q = "openai deep research explanation"
 
-
+CACHE_STR = "[deep_pink4]CACHE[/deep_pink4]"
 cache_dir = ".cache"
+
+
+@cache
+def _cache_dir_check(cache_dir: str = cache_dir):
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
 
 
 def _print_msgs(*msgs):
@@ -24,44 +32,53 @@ def _print_msgs(*msgs):
         logger.debug(f"[{i}]\n\t{msg}")
 
 
-def _hash_str(link: str, date: str = None, **kwargs) -> str:
-    hash_str = hashlib.md5(f"{link}{date}".encode()).hexdigest()
+def _hash_str(link: str, date: str = None, hash_len: int = 10, **kwargs) -> str:
     # 10 seems like short enough to be unique for our purposes, no idea if this is true
-    hash_str = hash_str[:10]
-    return hash_str
+    hash_str = hashlib.md5(f"{link}{date}".encode()).hexdigest()
+    return hash_str[:hash_len]
 
 
-def _check_cache(hash: str, cache_dir: str = cache_dir) -> str | None:
+def _cache_check(
+    hash: str,
+    check_cache: bool = True,
+    cache_dir: str = cache_dir,
+    _cb: callable = lambda x: x,
+) -> str | None:
     """Check if the hash is in the cache."""
+    if check_cache is False:
+        return None
+
     hash_file = f"{cache_dir}/{hash}"
     if os.path.exists(hash_file):
         with open(hash_file, "r") as f:
-            return f.read()
+            return _cb(f.read())
+
     return None
 
 
-def _save_cache(hash: str, text: str, cache_dir: str = cache_dir) -> None:
+def _cache_save(
+    hash: str,
+    text: str | dict,
+    save_cache: bool = True,
+    cache_dir: str = cache_dir,
+    _cb: callable = lambda x: x,
+) -> bool:
     """Save the text to the cache."""
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
+    if save_cache is False:
+        return False
+
     with open(f"{cache_dir}/{hash}", "w") as f:
-        f.write(text)
+        f.write(_cb(text))
+
+    return True
 
 
 @dataclass
 class AgentSetup:
     model_name: str = "ishumilin/deepseek-r1-coder-tools:70b"
+    alt_model_name: str = "llama3.2:latest-extended"
     base_url: str = "http://localhost:11434/v1"
     api_key: str = "ollama"
-
-    """
-    might be helpful for
-    """
-
-
-"""
-just made some helper DTO classes for helping me to design the system
-"""
 
 
 class ResearchQuery(BaseModel):
@@ -80,22 +97,24 @@ class PageMetadata(BaseModel):
 
 
 class PageResult(BaseModel):
-    metadata: PageMetadata | str
-    page_text: str
-    # extracted_text: str | None = None
+    # metadata: PageMetadata | str
+    url: str
+    date: str | None = ""
+    title: str | None = None
+    description: str | None = None
+
+    page_text: str | None = None
+
+    @computed_field
+    @property
+    def hash(self) -> str:
+        return _hash_str(self.url, date=self.date)
 
 
 class Failed(BaseModel):
     """Failed to generate queries."""
 
     ...
-
-
-def _url_in(url: str, result: PageResult | str) -> bool:
-    """Check if the URL is in the result."""
-    if isinstance(result, PageResult):
-        return url == result.metadata.url
-    return url == result
 
 
 @dataclass
@@ -108,9 +127,8 @@ class DeepResearchDeps:
     page_results: list[PageResult] = field(default_factory=list)
 
     def contains(self, url: str) -> bool:
-        return any(_url_in(url, result) for result in self.page_results)
+        return any(url == page.url for page in self.page_results)
 
-    #
     current_date: str = datetime.now().strftime("%Y-%m-%d")
     mock_user: bool = True
 
@@ -125,9 +143,10 @@ model = OpenAIModel(
 
 mock_agent = Agent(model, model_settings=model_settings)
 research_agent = Agent(model, deps_type=DeepResearchDeps, model_settings=model_settings)
+
 serp_agent = Agent(
     OpenAIModel(
-        model_name="llama3.2:latest",
+        model_name=AgentSetup.alt_model_name,
         base_url=AgentSetup.base_url,
         api_key=AgentSetup.api_key,
     ),
@@ -139,11 +158,7 @@ serp_agent = Agent(
 @serp_agent.system_prompt
 async def serp_agent_system_prompt(ctx: RunContext[DeepResearchDeps]) -> str:
     """Generate the system prompt for the agent."""
-    # You are an agent in an AI system that serves as a research assistant.
-    # You are the part of the system that is focused on SERP and can search terms to get url's which you will then extract relevant information from.
-    #       to find webpage url's.
-    # For a webpage url, you are to use the `fetch_page` tool to fetch the web page result.  Once the page has been fetched, you are to extract the relevant text from the page.
-    prompt = """For a given search term use the `get_search_results` tool with the search query to fetch a list of webpage results"""
+    prompt = """For a given search term use the `get_search_results` tool with the search query to fetch a list of `PageResult`."""
     return prompt
 
 
@@ -189,11 +204,6 @@ Your primary purpose is to assist with tasks requiring extensive research using 
     return prompt
 
 
-# 2. **Strongly bias towards using the `start_research_task`**
-#    - Treat every non-trivial question the user asks as a research task and use `clarify_with_text` or `start_research_task` accordingly.
-#    - Trivial questions, such as exchanging greetings or asking for simple text transformations, can be handled directly without research."""
-
-
 @research_agent.tool
 async def get_user_response(ctx: RunContext[DeepResearchDeps], query: str) -> str:
     if ctx.deps.mock_user:
@@ -206,14 +216,22 @@ async def get_user_response(ctx: RunContext[DeepResearchDeps], query: str) -> st
     return resp
 
 
+# async def start_research_task(ctx: RunContext[DeepResearchDeps], serp_query: str):
 @research_agent.tool
-async def start_research_task(ctx: RunContext[DeepResearchDeps], serp_query: str):
-    """Start a research task using the user query and research intensity."""
-    breakpoint()
-    # first gather search results
-    resp = await serp_agent.run(serp_query, deps=ctx.deps, result_type=list[PageResult])
-    # coalese the results
-    breakpoint()
+async def start_research_task(ctx: RunContext[DeepResearchDeps], serp_query: list[str]):
+    """Start a research task using the list of gathered terms user query and research intensity."""
+
+    for query in serp_query:
+        logger.info(f"Running search for {query}")
+        page_results = await serp_agent.run(query, deps=ctx.deps, result_type=list[PageResult])
+        ctx.deps.page_results.extend(page_results)
+
+
+@research_agent.tool
+async def get_final_report(ctx: RunContext[DeepResearchDeps]) -> str:
+    resp = await research_agent.run(
+        f"Generate a final report using the collected information", deps=ctx.deps, result_type=str
+    )
 
 
 @serp_agent.tool
@@ -224,25 +242,32 @@ async def get_search_results(ctx: RunContext[DeepResearchDeps], search_query: st
     client = ctx.deps.http_client
     page_results = ctx.deps.page_results
 
-    metadata_list = await perform_search(client, search_query)
+    page_list = await perform_search(client=client, search_query=search_query)
 
-    for metadata in metadata_list:
+    for page in page_list:
         # check if the page has already been fetched
-        if ctx.deps.contains(metadata):
-            logger.info(f"Page already fetched for {metadata.url}, skipping")
+        if ctx.deps.contains(page):
+            logger.info(f"Page already fetched for {page.url}, skipping")
             continue
 
-        logger.info(f'getting page text for "{metadata.url}"')
-        if (page_result := await fetch_page_result(client, metadata)) is not None:
-            logger.info(f"Added page result for {metadata.url}")
+        logger.info(f'getting page text for "{page.url}"')
+        if (page_result := await fetch_page_result(client=client, page=page)) is not None:
             page_results.append(page_result)
+            logger.info(f"Added page result for {page.url}")
 
+    logger.info(f"collected: {len(page_results)} results for {search_query}")
     return page_results
 
 
-async def perform_search(client: httpx.AsyncClient, search_query: str) -> list[PageMetadata]:
+async def perform_search(
+    client: httpx.AsyncClient,
+    search_query: str,
+    # check_cache: bool = False,
+    check_cache: bool = True,
+    save_cache: bool = True,
+) -> list[PageResult]:
     """
-    Perform a search with the provided search query and return a list of PageMetadata objects.
+    Perform a search with the provided search query and return a list of PageResult objects.
 
     For dev purposes, a saved example of the client.get is in `tests/fixtures/search_results.json`
 
@@ -250,36 +275,48 @@ async def perform_search(client: httpx.AsyncClient, search_query: str) -> list[P
     """
     results = []
 
-    resp = await client.get(
-        url=conf.serpapi.base_url,
-        params={
+    req_kwargs = {
+        "url": conf.serpapi.base_url,
+        "params": {
             "q": search_query,
             "engine": "google",
             "api_key": conf.serpapi.api_key,
         },
-    )
+    }
 
-    if resp.status_code == 200:
+    search_hash = _hash_str(str(req_kwargs))
+
+    if (resp_json := _cache_check(search_hash, check_cache=check_cache, _cb=json.loads)) is not None:
+        logger.info(f"{CACHE_STR}|search-found| {search_hash} for {search_query}")
+    else:
+        if (resp := await client.get(**req_kwargs)).status_code != 200:
+            logger.error(f"Error fetching search results for {search_query}")
+            return results
+
         resp_json = resp.json()
-        for item in resp_json.get("organic_results", []):
-            if "link" not in item:
-                logger.warning(f"Missing link in search result item: {item}")
-            else:
-                results.append(
-                    PageMetadata(
-                        url=item["link"],
-                        hash=_hash_str(**item),
-                        title=item["title"],
-                        description=item["snippet"],
-                    )
-                )
+
+        if _cache_save(search_hash, resp_json, save_cache=save_cache, _cb=json.dumps):
+            logger.info(f"{CACHE_STR}|search-saved| {search_hash} for {search_query}")
+
+    for item in resp_json.get("organic_results", []):
+        if "link" not in item:
+            logger.warning(f"Missing link in search result item: {item}")
+            continue
+
+        page = PageResult(
+            url=item["link"],
+            date=item.get("date"),
+            title=item.get("title"),
+            description=item.get("snippet"),
+        )
+        results.append(page)
 
     return results
 
 
 async def fetch_page_result(
     client: httpx.AsyncClient,
-    metadata: str | PageMetadata,
+    page: PageResult,
     check_cache: bool = True,
     save_cache: bool = True,
 ) -> PageResult | None:
@@ -288,30 +325,30 @@ async def fetch_page_result(
 
     cache the result based on the hash of the url and the date in the metadata to save on jina calls
 
-
     Using jina api to fetch page text for now, returns markdown of the page.
     """
-    url = metadata.url if isinstance(metadata, PageMetadata) else metadata
 
-    if check_cache and (text := _check_cache(metadata.hash)) is not None:
-        logger.info(f"Found cached result for {metadata.url}")
+    get_kwargs = {
+        "url": f"{conf.jina.base_url}{page.url}",
+        "headers": {"Authorization": f"Bearer {conf.jina.api_key}"},
+    }
 
+    if (text := _cache_check(page.hash, check_cache=check_cache)) is not None:
+        logger.info(f"{CACHE_STR}|page-found| {page.hash} for {page.url}")
     else:
-        resp = await client.get(
-            url=f"{conf.jina.base_url}{url}",
-            headers={"Authorization": f"Bearer {conf.jina.api_key}"},
-        )
+        resp = await client.get(**get_kwargs)
         # can get 200 and result still is messed up with this api, deal with later
         if resp.status_code != 200:
-            logger.error(f"Error fetching page text: {resp.text}")
+            logger.error(f"Error fetching page text for {page.url}")
             return None
 
         text = resp.text
         if save_cache:
-            _save_cache(metadata.hash, text)
-            logger.info(f"Cache {metadata.hash[:]} saved for {metadata.url}")
+            _cache_save(page.hash, text, save_cache=save_cache)
+            logger.info(f"{CACHE_STR}|page-saved| {page.hash} for {page.url}")
 
-    return PageResult(metadata=metadata, page_text=text)
+    page.page_text = text
+    return page
 
 
 async def main(query: str = base_q):
@@ -328,11 +365,11 @@ async def search(query: str = base_s_q, original_query: str = base_q):
         deps = DeepResearchDeps(http_client=client, original_query=original_query)
 
         with capture_run_messages() as messages:
-            result = await serp_agent.run(query, deps=deps)
+            result = await serp_agent.run(query, deps=deps, result_type=list[PageResult])
             msgs = result.all_messages()
 
-        _print_msgs(*msgs)
         logger.info(f"Finished lé search, got these messages, {msgs}")
+        breakpoint()
 
 
 def parse_args():
