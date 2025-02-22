@@ -17,8 +17,8 @@ from deepre.utils import logger
 base_q = "How does openai deep research work?"
 base_s_q = "openai deep research explanation"
 
-CACHE_STR = "[deep_pink4]CACHE[/deep_pink4]"
 cache_dir = ".cache"
+CACHE_STR = "[deep_pink4]CACHE[/deep_pink4]"
 
 
 @cache
@@ -81,23 +81,9 @@ class AgentSetup:
     api_key: str = "ollama"
 
 
-class ResearchQuery(BaseModel):
-    user_query: str
-    need_clarification: bool | None = None
-    # followup_queries: list["ResearchQuery"] | None = None
-
-
-class PageMetadata(BaseModel):
-    """Metadata for a web page."""
-
-    url: str
-    hash: str
-    title: str | None = None
-    description: str | None = None
-
-
 class PageResult(BaseModel):
-    # metadata: PageMetadata | str
+    """Result of a web page search."""
+
     url: str
     date: str | None = ""
     title: str | None = None
@@ -230,8 +216,11 @@ async def start_research_task(ctx: RunContext[DeepResearchDeps], serp_query: lis
 @research_agent.tool
 async def get_final_report(ctx: RunContext[DeepResearchDeps]) -> str:
     resp = await research_agent.run(
-        f"Generate a final report using the collected information", deps=ctx.deps, result_type=str
+        "Generate a final report using the collected information",
+        deps=ctx.deps,
+        result_type=str,
     )
+    return resp.data
 
 
 @serp_agent.tool
@@ -262,16 +251,12 @@ async def get_search_results(ctx: RunContext[DeepResearchDeps], search_query: st
 async def perform_search(
     client: httpx.AsyncClient,
     search_query: str,
-    # check_cache: bool = False,
     check_cache: bool = True,
     save_cache: bool = True,
 ) -> list[PageResult]:
     """
     Perform a search with the provided search query and return a list of PageResult objects.
-
     For dev purposes, a saved example of the client.get is in `tests/fixtures/search_results.json`
-
-    Possibly could have this `yield` a result so i search the result but idk if that will impact reflex
     """
     results = []
 
@@ -322,10 +307,7 @@ async def fetch_page_result(
 ) -> PageResult | None:
     """
     Fetch the text content of a webpage using the provided URL.
-
     cache the result based on the hash of the url and the date in the metadata to save on jina calls
-
-    Using jina api to fetch page text for now, returns markdown of the page.
     """
 
     get_kwargs = {
@@ -368,29 +350,15 @@ async def search(query: str = base_s_q, original_query: str = base_q):
             result = await serp_agent.run(query, deps=deps, result_type=list[PageResult])
             msgs = result.all_messages()
 
-        logger.info(f"Finished lé search, got these messages, {msgs}")
-        breakpoint()
+        logger.info(f"Finished lé search, got: {result.data}")
 
 
 def parse_args():
     import argparse
 
     parser = argparse.ArgumentParser(description="Deep Research CLI")
-    parser.add_argument(
-        "--mode",
-        "-m",
-        choices=["main", "search"],
-        default="main",
-        help="Run mode: main or search (default: main)",
-    )
-
-    # Add query argument without default - we'll set it based on mode
-    parser.add_argument(
-        "--query",
-        "-q",
-        type=str,
-        help="Query to research",
-    )
+    parser.add_argument("--mode", "-m", choices=["main", "search"], default="main")
+    parser.add_argument("--query", "-q", type=str, help="Query to research/search")
 
     args = parser.parse_args()
 
