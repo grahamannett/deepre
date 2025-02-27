@@ -4,7 +4,12 @@
     description     = "web app for open deep research with experimentally geared tooling"
     readme          = "README.md"
     requires-python = ">=3.12"
-    dependencies    = ["anyio>=4.8.0", "pydantic-ai>=0.0.23", "reflex>=0.7.0"]
+    dependencies    = [
+    "anyio>=4.8.0",
+    "logfire>=3.6.2",
+ "pydantic-ai>=0.0.23",
+ "reflex>=0.7.0",
+]
 
 [dependency-groups]
     dev = ["pytest>=8.3.4"]

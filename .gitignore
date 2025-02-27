@@ -22,3 +22,9 @@ services/
 .windsurfrules
 _ignore/
 .cache
+
+.cursor/
+.vscode/
+.coverage
+# ignore fixtures for time being, should be mocked later
+tests/fixtures/

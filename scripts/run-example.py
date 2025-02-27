@@ -4,8 +4,10 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cache
+from typing import Callable
 
 import httpx
+import logfire
 from pydantic import BaseModel, computed_field
 from pydantic_ai import Agent, RunContext, capture_run_messages
 from pydantic_ai.models.openai import OpenAIModel
@@ -19,6 +21,10 @@ base_s_q = "openai deep research explanation"
 
 cache_dir = ".cache"
 CACHE_STR = "[deep_pink4]CACHE[/deep_pink4]"
+limit_page_results = 3
+
+logfire.configure(token=conf.logfire.api_key)
+logfire.instrument_openai()
 
 
 @cache
@@ -32,7 +38,7 @@ def _print_msgs(*msgs):
         logger.debug(f"[{i}]\n\t{msg}")
 
 
-def _hash_str(link: str, date: str = None, hash_len: int = 10, **kwargs) -> str:
+def _hash_str(link: str, date: str = "", hash_len: int = 10, **kwargs) -> str:
     # 10 seems like short enough to be unique for our purposes, no idea if this is true
     hash_str = hashlib.md5(f"{link}{date}".encode()).hexdigest()
     return hash_str[:hash_len]
@@ -42,7 +48,7 @@ def _cache_check(
     hash: str,
     check_cache: bool = True,
     cache_dir: str = cache_dir,
-    _cb: callable = lambda x: x,
+    _cb: Callable[[str], str] = lambda x: x,
 ) -> str | None:
     """Check if the hash is in the cache."""
     if check_cache is False:
@@ -61,7 +67,7 @@ def _cache_save(
     text: str | dict,
     save_cache: bool = True,
     cache_dir: str = cache_dir,
-    _cb: callable = lambda x: x,
+    _cb: Callable[[str], str] = lambda x: x,
 ) -> bool:
     """Save the text to the cache."""
     if save_cache is False:
@@ -94,7 +100,7 @@ class PageResult(BaseModel):
     @computed_field
     @property
     def hash(self) -> str:
-        return _hash_str(self.url, date=self.date)
+        return _hash_str(self.url, date=self.date or "")
 
 
 class Failed(BaseModel):
@@ -232,6 +238,7 @@ async def get_search_results(ctx: RunContext[DeepResearchDeps], search_query: st
     page_results = ctx.deps.page_results
 
     page_list = await perform_search(client=client, search_query=search_query)
+    breakpoint()
 
     for page in page_list:
         # check if the page has already been fetched
@@ -243,6 +250,10 @@ async def get_search_results(ctx: RunContext[DeepResearchDeps], search_query: st
         if (page_result := await fetch_page_result(client=client, page=page)) is not None:
             page_results.append(page_result)
             logger.info(f"Added page result for {page.url}")
+
+    if limit_page_results:
+        page_results = page_results[:limit_page_results]
+        ctx.deps.page_results = page_results
 
     logger.info(f"collected: {len(page_results)} results for {search_query}")
     return page_results
@@ -285,7 +296,7 @@ async def perform_search(
 
     for item in resp_json.get("organic_results", []):
         if "link" not in item:
-            logger.warning(f"Missing link in search result item: {item}")
+            logger.warn(f"Missing link in search result item: {item}")
             continue
 
         page = PageResult(

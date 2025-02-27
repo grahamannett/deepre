@@ -17,7 +17,7 @@ class AIConfig:
 @dataclass
 class ExternalServiceConfig:
     api_key: str
-    base_url: str
+    base_url: str | None = None
 
 
 GeminiConfig = AIConfig(
@@ -43,11 +43,16 @@ JinaConfig = ExternalServiceConfig(
     base_url="https://r.jina.ai/",
 )
 
+LogFireConfig = ExternalServiceConfig(
+    api_key=environ.get("LOGFIRE_API_KEY", ""),
+)
+
 
 class AppConfig:
     ai = OllamaConfig
     serpapi = SerpConfig
     jina = JinaConfig
+    logfire = LogFireConfig
 
     # allows for smaller templates/models to be used during dev these are still 3B+
     # models since it seems like you want models that are capable of producing coherent
