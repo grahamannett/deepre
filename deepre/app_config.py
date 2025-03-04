@@ -3,6 +3,9 @@ from os import environ
 from pathlib import Path
 from typing import Any
 
+OLLAMA_URL = environ.get("OLLAMA_URL", "http://localhost:11434")
+DEFAULT_TIMEOUT = float(environ.get("DEFAULT_TIMEOUT", "30.0"))
+
 
 @dataclass
 class AIConfig:
@@ -29,7 +32,7 @@ OllamaConfig = AIConfig(
     provider="ollama",
     model_name="llama3.2:3b",
     api_key="ollama-api-key",
-    base_url="http://localhost:11434/v1",
+    base_url=f"{OLLAMA_URL}/v1",
 )
 
 
