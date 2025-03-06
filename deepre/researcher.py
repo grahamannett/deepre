@@ -101,24 +101,13 @@ class HTTPToolMeta:
         Returns:
             The processed response from _post_get_cb
         """
-        req_kwargs = self._make_req_kwargs(*args, **kwargs)
-        resp = await self._get_response(**req_kwargs)
-        return self._post_get_cb(resp)
-
-    async def _get_response(self, **req_kwargs) -> httpx.Response:
-        """Get an HTTP response from the API.
-
-        Args:
-            **req_kwargs: Keyword arguments to pass to get_kwargs
-
-        Returns:
-            HTTP response
-        """
         if not self.client:
             raise ValueError("Must set client on init or after")
 
+        req_kwargs = self._make_req_kwargs(*args, **kwargs)
         resp = await self.client.get(**req_kwargs)
-        return _check_resp(resp)
+        resp = _check_resp(resp)
+        return self._post_get_cb(resp)
 
     def _make_req_kwargs(self, *args, merge_kwargs: dict | None = None, **kwargs) -> dict[str, Any]:
         """
