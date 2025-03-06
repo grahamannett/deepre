@@ -19,8 +19,16 @@ class AIConfig:
 
 @dataclass
 class ExternalServiceConfig:
+    """Base configuration for external services that only require an API key."""
+
     api_key: str
-    base_url: str | None = None
+
+
+@dataclass
+class EndpointExternalServiceConfig(ExternalServiceConfig):
+    """Configuration for external services that require both API key and base URL."""
+
+    base_url: str
 
 
 GeminiConfig = AIConfig(
@@ -36,12 +44,12 @@ OllamaConfig = AIConfig(
 )
 
 
-SerpConfig = ExternalServiceConfig(
+SerpConfig = EndpointExternalServiceConfig(
     api_key=environ.get("SERPAPI_API_KEY", ""),
     base_url="https://serpapi.com/search",
 )
 
-JinaConfig = ExternalServiceConfig(
+JinaConfig = EndpointExternalServiceConfig(
     api_key=environ.get("JINA_API_KEY", ""),
     base_url="https://r.jina.ai/",
 )

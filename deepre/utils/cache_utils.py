@@ -64,8 +64,8 @@ def get_from_cache(
     callback: Callable = lambda x: x,
     check_cache: bool = True,
     cache_dir: str = DEFAULT_CACHE_DIR,
-) -> str | None:
-    """Get a value from the cache.
+) -> Any | None:
+    """Retrieve a value from the cache.
 
     Args:
         key: Cache key
@@ -109,9 +109,15 @@ def save_to_cache(
         return False
 
     ensure_cache_dir(cache_dir)
-    with open(get_cache_path(key, cache_dir), "w") as f:
-        f.write(callback(value))
-    return True
+    cache_path = get_cache_path(key, cache_dir)
+    try:
+        with open(cache_path, "w") as f:
+            f.write(callback(value))
+        return True
+    except Exception:
+        if os.path.exists(cache_path):
+            os.remove(cache_path)
+        return False
 
 
 class CacheManager:
