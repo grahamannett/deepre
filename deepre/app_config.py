@@ -51,7 +51,7 @@ SerpConfig = EndpointExternalServiceConfig(
 
 JinaConfig = EndpointExternalServiceConfig(
     api_key=environ.get("JINA_API_KEY", ""),
-    base_url="https://r.jina.ai/",
+    base_url="https://r.jina.ai",
 )
 
 LogFireConfig = ExternalServiceConfig(
