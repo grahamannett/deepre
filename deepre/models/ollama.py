@@ -1,4 +1,4 @@
-raise NotImplementedError("Ollama is not implemented yet")
+raise NotImplementedError("Go back to using the Pydantic-AI Ollama provider.")
 
 """
 Ollama model provider for pydantic-ai.
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import httpx
 from pydantic_ai.providers import Provider
 
-from deepre.models.providers import OllamaProvider
+from deepre.models.providers_ollama import OllamaProvider
 
 # Import pydantic-ai modules
 try:
@@ -31,7 +31,7 @@ except ImportError as _import_error:
 
 # Import Ollama-specific types and clients
 try:
-    from deepre.models.providers import OllamaAsyncClient
+    from deepre.models.providers_ollama import OllamaAsyncClient
     from ollama import ChatResponse
 except ImportError as _import_error:
     raise ImportError(
